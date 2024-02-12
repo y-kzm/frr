@@ -327,6 +327,8 @@ struct bgp_path_info {
 #define BGP_PATH_ACCEPT_OWN (1 << 16)
 #define BGP_PATH_MPLSVPN_LABEL_NH (1 << 17)
 #define BGP_PATH_MPLSVPN_NH_LABEL_BIND (1 << 18)
+/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+#define BGP_PATH_SEG6_MPLS_INTERWORKING (1 << 19)
 
 	/* BGP route type.  This can be static, RIP, OSPF, BGP etc.  */
 	uint8_t type;

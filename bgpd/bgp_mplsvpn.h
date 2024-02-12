@@ -83,6 +83,8 @@ extern void vpn_leak_zebra_vrf_sid_withdraw_per_af(struct bgp *bgp, afi_t afi);
 extern void vpn_leak_zebra_vrf_sid_withdraw_per_vrf(struct bgp *bgp);
 extern int vpn_leak_label_callback(mpls_label_t label, void *lblid, bool alloc);
 extern void ensure_vrf_tovpn_sid(struct bgp *vpn, struct bgp *vrf, afi_t afi);
+/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+extern void ensure_vrf_tovpn_label(struct bgp *vpn, struct bgp *vrf, afi_t afi);
 extern void delete_vrf_tovpn_sid(struct bgp *vpn, struct bgp *vrf, afi_t afi);
 extern void delete_vrf_tovpn_sid_per_af(struct bgp *vpn, struct bgp *vrf,
 					afi_t afi);
@@ -297,6 +299,9 @@ static inline void vpn_leak_postchange(enum vpn_policy_direction direction,
 
 		if (!bgp_vrf->vpn_policy[afi].tovpn_sid && !bgp_vrf->tovpn_sid)
 			ensure_vrf_tovpn_sid(bgp_vpn, bgp_vrf, afi);
+		/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+		else
+			ensure_vrf_tovpn_label(bgp_vpn, bgp_vrf, afi);
 
 		if ((!bgp_vrf->vpn_policy[afi].tovpn_sid &&
 		     bgp_vrf->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent) ||
@@ -371,6 +376,9 @@ extern void bgp_mplsvpn_path_nh_label_bind_unlink(struct bgp_path_info *pi);
 extern void bgp_mplsvpn_nh_label_bind_register_local_label(
 	struct bgp *bgp, struct bgp_dest *dest, struct bgp_path_info *pi);
 mpls_label_t bgp_mplsvpn_nh_label_bind_get_label(struct bgp_path_info *pi);
+/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+extern void bgp_mplsvpn_sid_bind_register_local_label(
+	struct bgp *bgp, struct bgp_dest *dest, struct bgp_path_info *pi, afi_t afi);
 
 /* used to bind a local label to the (label, nexthop) values
  * from an incoming BGP mplsvpn update

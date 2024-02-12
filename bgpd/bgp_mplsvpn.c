@@ -859,6 +859,13 @@ void ensure_vrf_tovpn_sid(struct bgp *bgp_vpn, struct bgp *bgp_vrf, afi_t afi)
 		return ensure_vrf_tovpn_sid_per_vrf(bgp_vpn, bgp_vrf);
 }
 
+/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+void ensure_vrf_tovpn_label(struct bgp *bgp_vpn, struct bgp *bgp_vrf, afi_t afi)
+{
+	/* per-vrf label ? */
+	bgp_vpn->vpn_policy[afi].tovpn_label = bgp_vrf->vpn_policy[afi].tovpn_label;
+}
+
 void delete_vrf_tovpn_sid_per_af(struct bgp *bgp_vpn, struct bgp *bgp_vrf,
 				 afi_t afi)
 {
@@ -4238,6 +4245,76 @@ void bgp_mplsvpn_nh_label_bind_register_local_label(struct bgp *bgp,
 			bgp_mplsvpn_nh_label_bind_send_nexthop_label(
 				bmnc, ZEBRA_MPLS_LABELS_REPLACE);
 	}
+
+	/* for debug (yokoo) */
+	zlog_debug("%s[%d]: (mpls <-> mpls) orig_label=%u, new_label=%u",
+			__func__, __LINE__, bmnc->orig_label, bmnc->new_label);
+}
+
+/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+void bgp_mplsvpn_sid_bind_register_local_label(struct bgp *bgp,
+						    struct bgp_dest *dest,
+						    struct bgp_path_info *pi, afi_t afi)
+{
+	struct bgp_mplsvpn_nh_label_bind_cache *bmnc;
+	struct bgp_mplsvpn_nh_label_bind_cache_head *tree;
+
+	tree = &bgp->mplsvpn_nh_label_bind;
+	bmnc = bgp_mplsvpn_nh_label_bind_find(
+		tree, &pi->nexthop->prefix, decode_label(&pi->extra->label[0]));
+	if (!bmnc) {
+		bmnc = bgp_mplsvpn_nh_label_bind_new(
+			tree, &pi->nexthop->prefix,
+			decode_label(&pi->extra->label[0]));
+		/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+		/*
+		 * ここで扱える struct bgp は default vrf でインスタンス化されたもの。
+		 * vrf_id がわかれば下記のように lookup できる
+		 * ``` struct bgp *my_bgp = bgp_lookup_by_vrf_id(5); ```
+		 * vrf-id(=5)がほしい..
+		 * → この方法は断念して、struct bgp (default vrf) のインスタンスに config 時に
+		 *   値（200 ）が入る struct bgp (vrf USER1) のインスタンスから取得しておくことにす
+		 *   る。bgp_vpn (default vrf) の bgp->vpn_policy[afi].tovpn_label に
+		 *   bgp_vrf (vrf USER1) の bgp->vpn_policy[afi].tovpn_label の値をコピー
+		 *   しても問題ないのかは要検討。 （sidの方はそれっぽいことをしていたので大丈夫だと思う）
+		 */
+		SET_FLAG(pi->flags, BGP_PATH_SEG6_MPLS_INTERWORKING);
+		bmnc->new_label = bgp->vpn_policy[afi].tovpn_label;
+
+		bmnc->bgp_vpn = bgp;
+		bmnc->allocation_in_progress = true;
+		bgp_lp_get(LP_TYPE_BGP_L3VPN_BIND, bmnc,
+			   bgp_mplsvpn_nh_label_bind_get_local_label_cb);
+	}
+
+	if (pi->mplsvpn.bmnc.nh_label_bind_cache == bmnc)
+		/* no change */
+		return;
+
+	bgp_mplsvpn_path_nh_label_bind_unlink(pi);
+
+	/* updates NHT pi list reference */
+	LIST_INSERT_HEAD(&(bmnc->paths), pi, mplsvpn.bmnc.nh_label_bind_thread);
+	pi->mplsvpn.bmnc.nh_label_bind_cache = bmnc;
+	pi->mplsvpn.bmnc.nh_label_bind_cache->path_count++;
+	SET_FLAG(pi->flags, BGP_PATH_SEG6_MPLS_INTERWORKING);
+	bmnc->last_update = monotime(NULL);
+
+	/* Add or update the selected nexthop */
+	if (!bmnc->nh) {
+		bmnc->nh = nexthop_dup(pi->nexthop->nexthop, NULL);
+	} else if (!nexthop_same(pi->nexthop->nexthop, bmnc->nh)) {
+		nexthop_free(bmnc->nh);
+		bmnc->nh = nexthop_dup(pi->nexthop->nexthop, NULL);
+		if (bmnc->new_label != MPLS_INVALID_LABEL) {
+			bgp_mplsvpn_nh_label_bind_send_nexthop_label(
+				bmnc, ZEBRA_MPLS_LABELS_REPLACE);
+		}
+	}
+
+	/* for debug (yokoo) */
+	zlog_debug("%s[%d]: (mpls <-> srv6) orig_label=%u, new_label=%u",
+			__func__, __LINE__, bmnc->orig_label, bmnc->new_label);
 }
 
 static void show_bgp_mplsvpn_nh_label_bind_internal(struct vty *vty,

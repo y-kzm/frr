@@ -2467,7 +2467,6 @@ static int bgp_update_receive(struct peer_connection *connection,
 
 		if (afi && peer->afc[afi][safi]) {
 			struct vrf *vrf = vrf_lookup_by_id(peer->bgp->vrf_id);
-
 			/* End-of-RIB received */
 			if (!CHECK_FLAG(peer->af_sflags[afi][safi],
 					PEER_STATUS_EOR_RECEIVED)) {
