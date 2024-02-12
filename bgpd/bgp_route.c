@@ -3305,6 +3305,12 @@ bgp_mplsvpn_handle_label_allocation(struct bgp *bgp, struct bgp_dest *dest,
  *     We have no eligible route that we can announce or the rn
  *     is being removed.
  */
+
+/**
+ * UPDATE を受け取って best path を選択する
+ * old_select がなければ new_select を再配布
+ * new_select != old_select であれば更新した new_select を再配布
+ */
 static void bgp_process_main_one(struct bgp *bgp, struct bgp_dest *dest,
 				 afi_t afi, safi_t safi)
 {
@@ -3372,8 +3378,13 @@ static void bgp_process_main_one(struct bgp *bgp, struct bgp_dest *dest,
 		/* mpls vpn path:
 		 * Do we need to allocate or free labels?
 		 */
+		// if sr-mpls
+		// Local Label を Recieved Label に bind
+		// bgp_mplsvpn_nh_label_bind_register_local_label()
 		bgp_mplsvpn_handle_label_allocation(bgp, dest, new_select,
 						    old_select, afi);
+
+		// if srv6
 
 	if (debug)
 		zlog_debug(

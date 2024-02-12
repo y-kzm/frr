@@ -19486,6 +19486,16 @@ DEFPY(mpls_bgp_forwarding, mpls_bgp_forwarding_cmd,
 	return CMD_SUCCESS;
 }
 
+/**
+ * mpls bgp l3vpn-multi-domain-switching
+ * @brief
+ * neighbor AS へ Labeled L3VPN 経路を redistribute する
+ * この設定がされているインターフェースで MPLS Labeled L3VPN 経路を
+ * 受け取ったら、Local Label で re-redistribete し、
+ * Local Label を Recieved Label（neighbor AS から受け取った Label）
+ * に SWAP するエントリを MPLS table へ追加する
+ * （bind the local label to the received label.）
+ */
 DEFPY(mpls_bgp_l3vpn_multi_domain_switching,
       mpls_bgp_l3vpn_multi_domain_switching_cmd,
       "[no$no] mpls bgp l3vpn-multi-domain-switching",
@@ -19495,6 +19505,7 @@ DEFPY(mpls_bgp_l3vpn_multi_domain_switching,
 	bool check;
 	struct bgp_interface *iifp;
 
+	// frr から interface 情を取得
 	VTY_DECLVAR_CONTEXT(interface, ifp);
 	iifp = ifp->info;
 	if (!iifp) {
@@ -19507,6 +19518,7 @@ DEFPY(mpls_bgp_l3vpn_multi_domain_switching,
 	if (no)
 		UNSET_FLAG(iifp->flags, BGP_INTERFACE_MPLS_L3VPN_SWITCHING);
 	else
+		// interface の MPLS L3VPN Switching を有効にする Flag をセット
 		SET_FLAG(iifp->flags, BGP_INTERFACE_MPLS_L3VPN_SWITCHING);
 	/* trigger a nht update on eBGP sessions */
 	if (if_is_operative(ifp))

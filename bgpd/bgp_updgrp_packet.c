@@ -800,6 +800,7 @@ struct bpacket *subgroup_update_packet(struct update_subgroup *subgrp)
 					   path) &&
 				   bgp_path_info_nexthop_changed(path, peer,
 								 afi)) {
+				// eBGP で配布される MPLS Labeled L3VPN の UPDATE はこっちを通る
 				/* Redistributed mpls vpn route between distinct
 				 * peers from 'pi->peer' to 'to',
 				 * and an mpls label is used in this path,
@@ -813,6 +814,10 @@ struct bpacket *subgroup_update_packet(struct update_subgroup *subgrp)
 				label_pnt = &label;
 				num_labels = 1;
 			} else if (path && path->extra) {
+				// iBGP で 配布される BGP Prefix-SID を含む UPDATE はこっちを通る
+				// この UPDATE に含まれる Label 値は、SRv6 SID の Function 部のビットを表している
+				// この Label 値を受け取ったら Local Label に変換してから eBGP で re-redistribute する
+				// 変換後の Label 値は今回は config から取得 （label vpn export XXX）
 				label_pnt = &path->extra->label[0];
 				num_labels = path->extra->num_labels;
 			}
