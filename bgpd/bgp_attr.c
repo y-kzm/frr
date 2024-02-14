@@ -4730,14 +4730,10 @@ bgp_size_t bgp_packet_attribute(struct bgp *bgp, struct peer *peer,
 	/* SRv6 Service Information Attribute. */
 	if ((afi == AFI_IP || afi == AFI_IP6) && safi == SAFI_MPLS_VPN) {
 		/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
-		/*
-		 * 簡易的な改造のため、要検討。struct interface を取得
-		 * できれば、フラグを使えるかもしれない。
-		 * → ただし、新たに追加したフラグは pe-srv6 側のインターフェース
-		 *   でのみ有効なので、asbr-mpls 側のインターフェースにも設定が
-		 *   必要になるかも..？
-		 */
-		if (peer->sort == BGP_PEER_EBGP) {
+		if (peer->sort == BGP_PEER_EBGP && 
+			CHECK_FLAG(peer->af_flags[afi][safi], 
+				PEER_FLAG_SEG6_MPLS_LABEL_SWITCHING) &&
+			afi == AFI_IP) { /* not supported ipv6 vpn */
 			attr->srv6_l3vpn = NULL;
 		}
 		if (attr->srv6_l3vpn) {

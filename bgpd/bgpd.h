@@ -1529,6 +1529,9 @@ struct peer {
 #define PEER_FLAG_MAX_PREFIX_FORCE (1ULL << 26)
 #define PEER_FLAG_DISABLE_ADDPATH_RX (1ULL << 27)
 #define PEER_FLAG_SOO (1ULL << 28)
+/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+#define PEER_FLAG_SEG6_MPLS_LABEL_SWITCHING (1ULL << 29) /* switch srv6 to mpls label */
+
 #define PEER_FLAG_ACCEPT_OWN (1ULL << 63)
 
 	enum bgp_addpath_strat addpath_type[AFI_MAX][SAFI_MAX];

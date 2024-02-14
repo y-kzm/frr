@@ -4608,6 +4608,9 @@ static const struct peer_flag_action peer_af_flag_action_list[] = {
 	{PEER_FLAG_DISABLE_ADDPATH_RX, 0, peer_change_none},
 	{PEER_FLAG_SOO, 0, peer_change_reset},
 	{PEER_FLAG_ACCEPT_OWN, 0, peer_change_reset},
+	/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+	{PEER_FLAG_SEG6_MPLS_LABEL_SWITCHING, 0, peer_change_reset},
+
 	{0, 0, 0}};
 
 /* Proper action set. */
@@ -4967,6 +4970,11 @@ static int peer_af_flag_modify(struct peer *peer, afi_t afi, safi_t safi,
 				  invert);
 			return 0;
 		}
+	}
+
+	/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+	if (flag & PEER_FLAG_SEG6_MPLS_LABEL_SWITCHING && ptype == BGP_PEER_EBGP) {
+		SET_FLAG(peer->af_flags[afi][safi], PEER_FLAG_SEG6_MPLS_LABEL_SWITCHING);
 	}
 
 	/*

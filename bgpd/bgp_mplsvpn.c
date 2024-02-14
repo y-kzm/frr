@@ -4267,19 +4267,26 @@ void bgp_mplsvpn_sid_bind_register_local_label(struct bgp *bgp,
 			tree, &pi->nexthop->prefix,
 			decode_label(&pi->extra->label[0]));
 		/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
-		/*
-		 * ここで扱える struct bgp は default vrf でインスタンス化されたもの。
-		 * vrf_id がわかれば下記のように lookup できる
-		 * ``` struct bgp *my_bgp = bgp_lookup_by_vrf_id(5); ```
-		 * vrf-id(=5)がほしい..
-		 * → この方法は断念して、struct bgp (default vrf) のインスタンスに config 時に
-		 *   値（200 ）が入る struct bgp (vrf USER1) のインスタンスから取得しておくことにす
-		 *   る。bgp_vpn (default vrf) の bgp->vpn_policy[afi].tovpn_label に
-		 *   bgp_vrf (vrf USER1) の bgp->vpn_policy[afi].tovpn_label の値をコピー
-		 *   しても問題ないのかは要検討。 （sidの方はそれっぽいことをしていたので大丈夫だと思う）
-		 */
-		SET_FLAG(pi->flags, BGP_PATH_SEG6_MPLS_INTERWORKING);
-		bmnc->new_label = bgp->vpn_policy[afi].tovpn_label;
+		struct bgp *tmp_bgp;
+		struct listnode *node, *nnode;
+		struct ecommunity *ecomm = bgp_attr_get_ecommunity(pi->attr);
+		for (ALL_LIST_ELEMENTS(bm->bgp, node, nnode, tmp_bgp)) {
+			if (tmp_bgp->inst_type != BGP_INSTANCE_TYPE_VRF)
+				continue;
+			/*
+			 * Expected to be stored string of RT that put in config. But, 
+			 * tmp_bgp->vpn_policy[afi].rtlist[BGP_VPN_POLICY_DIR_TOVPN]->str
+			 *  is "（null）" ...
+			 * The "ecommunity->string", which can be obtained with 
+			 * "bgp_attr_get_ecommunity(pi->attr)", is used for 
+			 * displaying with the show command.
+			 * It is possible to get the binary of RT from "ecmomunity->val".
+			 */
+			if (ecommunity_include(
+				ecomm, tmp_bgp->vpn_policy[afi].rtlist[BGP_VPN_POLICY_DIR_TOVPN])) { 
+					bmnc->new_label = tmp_bgp->vpn_policy[afi].tovpn_label;
+			}
+		}
 
 		bmnc->bgp_vpn = bgp;
 		bmnc->allocation_in_progress = true;
@@ -4297,7 +4304,7 @@ void bgp_mplsvpn_sid_bind_register_local_label(struct bgp *bgp,
 	LIST_INSERT_HEAD(&(bmnc->paths), pi, mplsvpn.bmnc.nh_label_bind_thread);
 	pi->mplsvpn.bmnc.nh_label_bind_cache = bmnc;
 	pi->mplsvpn.bmnc.nh_label_bind_cache->path_count++;
-	SET_FLAG(pi->flags, BGP_PATH_SEG6_MPLS_INTERWORKING);
+	SET_FLAG(pi->flags, BGP_PATH_SEG6_MPLS_LABEL_SWITCHING);
 	bmnc->last_update = monotime(NULL);
 
 	/* Add or update the selected nexthop */

@@ -3269,8 +3269,7 @@ bgp_mplsvpn_handle_label_allocation(struct bgp *bgp, struct bgp_dest *dest,
 		if (bgp_ifp &&
 		    (CHECK_FLAG(bgp_ifp->flags,
 			       BGP_INTERFACE_MPLS_L3VPN_SWITCHING) ||
-			CHECK_FLAG(bgp_ifp->flags,
-			       BGP_INTERFACE_MPLS_SEG6_L3VPN_SWITCHING)) &&
+			new_select->attr->srv6_l3vpn) &&
 		    new_select->sub_type != BGP_ROUTE_IMPORTED &&
 		    new_select->sub_type != BGP_ROUTE_STATIC) {
 				/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
@@ -3279,13 +3278,12 @@ bgp_mplsvpn_handle_label_allocation(struct bgp *bgp, struct bgp_dest *dest,
 						// mpls
 						bgp_mplsvpn_nh_label_bind_register_local_label(
 							bgp, dest, new_select);
-				} else if (CHECK_FLAG(bgp_ifp->flags, BGP_INTERFACE_MPLS_SEG6_L3VPN_SWITCHING))
+				} else if (new_select->attr->srv6_l3vpn) 
 					// srv6
 					bgp_mplsvpn_sid_bind_register_local_label(
 						bgp, dest, new_select, afi);
-				else
-					bgp_mplsvpn_path_nh_label_bind_unlink(new_select);
-			}
+		} else 
+			bgp_mplsvpn_path_nh_label_bind_unlink(new_select);
 	} else {
 		if (new_select)
 			/* no mpls vpn allocation */

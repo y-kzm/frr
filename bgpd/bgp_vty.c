@@ -18461,6 +18461,11 @@ static void bgp_config_write_peer_af(struct vty *vty, struct bgp *bgp,
 			addr);
 	}
 
+	/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+	if (peergroup_af_flag_check(peer, afi, safi, PEER_FLAG_SEG6_MPLS_LABEL_SWITCHING)) {
+		vty_out(vty, "  neighbor %s seg6-mpls-label-switching\n", addr);
+	}
+
 	/* maximum-prefix. */
 	if (peergroup_af_flag_check(peer, afi, safi, PEER_FLAG_MAX_PREFIX)) {
 		vty_out(vty, "  neighbor %s maximum-prefix %u", addr,
@@ -19528,35 +19533,23 @@ DEFPY(mpls_bgp_l3vpn_multi_domain_switching,
 }
 
 /* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
-DEFPY(mpls_bgp_l3vpn_multi_domain_switching_seg6_interworking,
-      mpls_bgp_l3vpn_multi_domain_switching_seg6_interworking_cmd,
-      "[no$no] mpls bgp l3vpn-multi-domain-switching seg6-interworking",
-      NO_STR MPLS_STR BGP_STR
-      "Bind a local MPLS label to incoming L3VPN updates\n"
-      "draft-spring-srv6-mpls-interworking-service-iw (yokoo)\n")
+DEFUN (neighbor_seg6_mpls_label_switching,
+       neighbor_seg6_mpls_label_switching_cmd,
+       "neighbor <A.B.C.D|X:X::X:X|WORD> seg6-mpls-label-switching",
+       NEIGHBOR_STR
+       NEIGHBOR_ADDR_STR2
+       "draft-spring-srv6-mpls-interworking-service-iw\n")
 {
-	bool check;
-	struct bgp_interface *iifp;
+	int idx_peer = 1;
 
-	VTY_DECLVAR_CONTEXT(interface, ifp);
-	iifp = ifp->info;
-	if (!iifp) {
-		vty_out(vty, "Interface %s not available\n", ifp->name);
-		return CMD_WARNING_CONFIG_FAILED;
-	}
-	check = CHECK_FLAG(iifp->flags, BGP_INTERFACE_MPLS_SEG6_L3VPN_SWITCHING);
-	if (check == !no)
-		return CMD_SUCCESS;
-	if (no)
-		UNSET_FLAG(iifp->flags, BGP_INTERFACE_MPLS_SEG6_L3VPN_SWITCHING);
-	else
-		SET_FLAG(iifp->flags, BGP_INTERFACE_MPLS_SEG6_L3VPN_SWITCHING);
-	/* trigger a nht update on eBGP sessions */
-	if (if_is_operative(ifp))
-		bgp_nht_ifp_up(ifp);
-
-	return CMD_SUCCESS;
+	return peer_af_flag_set_vty(vty, argv[idx_peer]->arg, bgp_node_afi(vty),
+				    bgp_node_safi(vty),
+				    PEER_FLAG_SEG6_MPLS_LABEL_SWITCHING);
 }
+
+/*
+ * TODO: no_neighbor_seg6_mpls_label_switching_cmd
+ */
 
 DEFPY (bgp_inq_limit,
        bgp_inq_limit_cmd,
@@ -20683,13 +20676,19 @@ void bgp_vty_init(void)
 	install_element(BGP_VPNV6_NODE, &neighbor_weight_cmd);
 	install_element(BGP_VPNV6_NODE, &no_neighbor_weight_cmd);
 
+	/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+	/* neighbor switching srv6 to mpls label */
+	install_element(BGP_VPNV4_NODE, &neighbor_seg6_mpls_label_switching_cmd);
+	//install_element(BGP_VPNV4_NODE, &no_neighbor_seg6_mpls_label_switching_cmd);
+
+
 	/* "neighbor override-capability" commands. */
 	install_element(BGP_NODE, &neighbor_override_capability_cmd);
 	install_element(BGP_NODE, &no_neighbor_override_capability_cmd);
 
 	/* "neighbor strict-capability-match" commands. */
 	install_element(BGP_NODE, &neighbor_strict_capability_cmd);
-	install_element(BGP_NODE, &no_neighbor_strict_capability_cmd);
+	//install_element(BGP_NODE, &no_neighbor_strict_capability_cmd);
 
 	/* "neighbor timers" commands. */
 	install_element(BGP_NODE, &neighbor_timers_cmd);
