@@ -859,13 +859,6 @@ void ensure_vrf_tovpn_sid(struct bgp *bgp_vpn, struct bgp *bgp_vrf, afi_t afi)
 		return ensure_vrf_tovpn_sid_per_vrf(bgp_vpn, bgp_vrf);
 }
 
-/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
-void ensure_vrf_tovpn_label(struct bgp *bgp_vpn, struct bgp *bgp_vrf, afi_t afi)
-{
-	/* per-vrf label ? */
-	bgp_vpn->vpn_policy[afi].tovpn_label = bgp_vrf->vpn_policy[afi].tovpn_label;
-}
-
 void delete_vrf_tovpn_sid_per_af(struct bgp *bgp_vpn, struct bgp *bgp_vrf,
 				 afi_t afi)
 {
@@ -4247,7 +4240,7 @@ void bgp_mplsvpn_nh_label_bind_register_local_label(struct bgp *bgp,
 	}
 
 	/* for debug (yokoo) */
-	zlog_debug("%s[%d]: (mpls <-> mpls) orig_label=%u, new_label=%u",
+	zlog_debug("%s[%d]: (mpls -> mpls) orig_label=%u, new_label=%u",
 			__func__, __LINE__, bmnc->orig_label, bmnc->new_label);
 }
 
@@ -4266,36 +4259,89 @@ void bgp_mplsvpn_sid_bind_register_local_label(struct bgp *bgp,
 		bmnc = bgp_mplsvpn_nh_label_bind_new(
 			tree, &pi->nexthop->prefix,
 			decode_label(&pi->extra->label[0]));
-		/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
-		struct bgp *tmp_bgp;
-		struct listnode *node, *nnode;
-		struct ecommunity *ecomm = bgp_attr_get_ecommunity(pi->attr);
-		for (ALL_LIST_ELEMENTS(bm->bgp, node, nnode, tmp_bgp)) {
-			if (tmp_bgp->inst_type != BGP_INSTANCE_TYPE_VRF)
-				continue;
-			/*
-			 * Expected to be stored string of RT that put in config. But, 
-			 * tmp_bgp->vpn_policy[afi].rtlist[BGP_VPN_POLICY_DIR_TOVPN]->str
-			 *  is "（null）" ...
-			 * The "ecommunity->string", which can be obtained with 
-			 * "bgp_attr_get_ecommunity(pi->attr)", is used for 
-			 * displaying with the show command.
-			 * It is possible to get the binary of RT from "ecmomunity->val".
-			 */
-			if (ecommunity_include(
-				ecomm, tmp_bgp->vpn_policy[afi].rtlist[BGP_VPN_POLICY_DIR_TOVPN])) { 
-					bmnc->new_label = tmp_bgp->vpn_policy[afi].tovpn_label;
-			}
-		}
-
 		bmnc->bgp_vpn = bgp;
 		bmnc->allocation_in_progress = true;
-		bgp_lp_get(LP_TYPE_BGP_L3VPN_BIND, bmnc,
-			   bgp_mplsvpn_nh_label_bind_get_local_label_cb);
+	}
+	/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+	struct bgp *tmp_bgp;
+	struct listnode *node, *nnode;
+	struct ecommunity *ecomm = bgp_attr_get_ecommunity(pi->attr);
+	for (ALL_LIST_ELEMENTS(bm->bgp, node, nnode, tmp_bgp)) {
+		if (tmp_bgp->inst_type != BGP_INSTANCE_TYPE_VRF)
+			continue;
+		/*
+		* Expected to be stored string of RT that put in config. But, 
+		* tmp_bgp->vpn_policy[afi].rtlist[BGP_VPN_POLICY_DIR_TOVPN]->str
+		*  is "（null）" ...
+		* The "ecommunity->string", which can be obtained with 
+		* "bgp_attr_get_ecommunity(pi->attr)", is used for 
+		* displaying with the show command.
+		* It is possible to get the binary of RT from "ecmomunity->val".
+		*/
+		if (ecommunity_include(
+			ecomm, tmp_bgp->vpn_policy[afi].rtlist[BGP_VPN_POLICY_DIR_TOVPN])) { 
+				bmnc->new_label = tmp_bgp->vpn_policy[afi].tovpn_label;
+				bmnc->allocation_in_progress = false;
+				break;
+		} // TODO: else { not found }
 	}
 
 	if (pi->mplsvpn.bmnc.nh_label_bind_cache == bmnc)
 		/* no change */
+		return;
+
+	/*
+	 * TODO: Implement this equivalent process for srv6 mpls label switching
+	 */
+	bgp_mplsvpn_path_nh_label_bind_unlink(pi); 
+
+	/* updates NHT pi list reference */
+	LIST_INSERT_HEAD(&(bmnc->paths), pi, mplsvpn.bmnc.nh_label_bind_thread);
+	pi->mplsvpn.bmnc.nh_label_bind_cache = bmnc;
+	pi->mplsvpn.bmnc.nh_label_bind_cache->path_count++;
+	SET_FLAG(pi->flags, BGP_PATH_SEG6_MPLS_LABEL_SWITCHING);
+	bmnc->last_update = monotime(NULL);
+
+	/* for debug (yokoo) */
+	zlog_debug("%s[%d]: (srv6 -> mpls) orig_label=%u, new_label=%u",
+			__func__, __LINE__, bmnc->orig_label, bmnc->new_label);
+}
+
+/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+void bgp_mplspvn_nh_label_bind_register_sid(struct bgp *bgp,
+						    struct bgp_dest *dest,
+						    struct bgp_path_info *pi, afi_t afi)
+{
+	struct bgp_mplsvpn_nh_label_bind_cache *bmnc;
+	struct bgp_mplsvpn_nh_label_bind_cache_head *tree;
+
+	tree = &bgp->mplsvpn_nh_label_bind;
+	bmnc = bgp_mplsvpn_nh_label_bind_find(
+		tree, &pi->nexthop->prefix, decode_label(&pi->extra->label[0]));
+	if (!bmnc) {
+		bmnc = bgp_mplsvpn_nh_label_bind_new(
+			tree, &pi->nexthop->prefix,
+			decode_label(&pi->extra->label[0]));
+		bmnc->bgp_vpn = bgp;
+		bmnc->allocation_in_progress = true;
+	}
+	/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+	struct bgp *tmp_bgp;
+	struct listnode *node, *nnode;
+	struct ecommunity *ecomm = bgp_attr_get_ecommunity(pi->attr);
+	for (ALL_LIST_ELEMENTS(bm->bgp, node, nnode, tmp_bgp)) {
+		if (tmp_bgp->inst_type != BGP_INSTANCE_TYPE_VRF)
+			continue;
+		if (ecommunity_include(
+			ecomm, tmp_bgp->vpn_policy[afi].rtlist[BGP_VPN_POLICY_DIR_TOVPN])) { 
+				bmnc->new_label = (mpls_label_t)tmp_bgp->vpn_policy[afi].tovpn_sid_transpose_label;
+				bmnc->allocation_in_progress = false;
+				break;
+		}
+	}		   bgp_mplsvpn_nh_label_bind_get_local_label_cb);
+
+	if (pi->mplsvpn.bmnc.nh_label_bind_cache == bmnc)
+	 	/* no change */
 		return;
 
 	bgp_mplsvpn_path_nh_label_bind_unlink(pi);
@@ -4307,20 +4353,8 @@ void bgp_mplsvpn_sid_bind_register_local_label(struct bgp *bgp,
 	SET_FLAG(pi->flags, BGP_PATH_SEG6_MPLS_LABEL_SWITCHING);
 	bmnc->last_update = monotime(NULL);
 
-	/* Add or update the selected nexthop */
-	if (!bmnc->nh) {
-		bmnc->nh = nexthop_dup(pi->nexthop->nexthop, NULL);
-	} else if (!nexthop_same(pi->nexthop->nexthop, bmnc->nh)) {
-		nexthop_free(bmnc->nh);
-		bmnc->nh = nexthop_dup(pi->nexthop->nexthop, NULL);
-		if (bmnc->new_label != MPLS_INVALID_LABEL) {
-			bgp_mplsvpn_nh_label_bind_send_nexthop_label(
-				bmnc, ZEBRA_MPLS_LABELS_REPLACE);
-		}
-	}
-
 	/* for debug (yokoo) */
-	zlog_debug("%s[%d]: (mpls <-> srv6) orig_label=%u, new_label=%u",
+	zlog_debug("%s[%d]: (mpls -> srv6) orig_label=%u, new_label=%u",
 			__func__, __LINE__, bmnc->orig_label, bmnc->new_label);
 }
 

@@ -812,25 +812,16 @@ struct bpacket *subgroup_update_packet(struct update_subgroup *subgrp)
 					path);
 				label_pnt = &label;
 				num_labels = 1;
-				/* for debug (yokoo) */
-				zlog_debug("%s[%d-if(1)]: label(redistributed)=%u",
-						__func__, __LINE__, decode_label(label_pnt));
-			} else if (CHECK_FLAG(path->flags, BGP_PATH_SEG6_MPLS_LABEL_SWITCHING) 
-						&& CHECK_FLAG(peer->af_flags[afi][SAFI_MPLS_VPN], PEER_FLAG_SEG6_MPLS_LABEL_SWITCHING)) {
+			} else if (CHECK_FLAG(path->flags, BGP_PATH_SEG6_MPLS_LABEL_SWITCHING) &&
+						path->mplsvpn.bmnc.nh_label_bind_cache) {
 				/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
 				label = bgp_mplsvpn_nh_label_bind_get_label(
 					path);
 				label_pnt = &label;
 				num_labels = 1;
-				/* for debug (yokoo) */
-				zlog_debug("%s[%d-if(2)]: label(redistributed)=%u",
-						__func__, __LINE__, decode_label(label_pnt));
 			} else if (path && path->extra) {
 				label_pnt = &path->extra->label[0];
 				num_labels = path->extra->num_labels;
-				/* for debug (yokoo) */
-				zlog_debug("%s[%d-if(3)]: label(redistributed)=%u",
-						__func__, __LINE__, decode_label(label_pnt));
 			}
 
 			if (stream_empty(snlri))

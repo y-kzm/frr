@@ -9605,12 +9605,6 @@ DEFPY (af_label_vpn_export,
 	}
 
 	/* post-change: re-export vpn routes */
-	struct bgp *bgp_vpn = bgp_get_default();
-	/* for debug (yokoo) */
-	zlog_debug("%s[%d]: bgp_vpn->label=%d, bgp_vrf->label=%d",
-					__func__, __LINE__,
-					bgp_vpn->vpn_policy[afi].tovpn_label, bgp->vpn_policy[afi].tovpn_label);
-
 	vpn_leak_postchange(BGP_VPN_POLICY_DIR_TOVPN, afi,
 			    bgp_get_default(), bgp);
 
@@ -19447,12 +19441,6 @@ static int config_write_interface_one(struct vty *vty, struct vrf *vrf)
 				" mpls bgp l3vpn-multi-domain-switching\n");
 			write++;
 		}
-		if (CHECK_FLAG(iifp->flags,
-			       BGP_INTERFACE_MPLS_SEG6_L3VPN_SWITCHING)) {
-			vty_out(vty,
-				" mpls bgp l3vpn-multi-domain-switching seg6-interworking\n");
-			write++;
-		}
 
 		if_vty_config_end(vty);
 	}
@@ -19612,8 +19600,6 @@ static void bgp_vty_if_init(void)
 	install_element(INTERFACE_NODE, &mpls_bgp_forwarding_cmd);
 	install_element(INTERFACE_NODE,
 			&mpls_bgp_l3vpn_multi_domain_switching_cmd);
-		install_element(INTERFACE_NODE,
-			&mpls_bgp_l3vpn_multi_domain_switching_seg6_interworking_cmd);
 }
 
 void bgp_vty_init(void)

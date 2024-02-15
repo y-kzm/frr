@@ -4727,6 +4727,63 @@ bgp_size_t bgp_packet_attribute(struct bgp *bgp, struct peer *peer,
 		}
 	}
 
+	/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
+	if (peer->sort == BGP_PEER_IBGP &&
+			afi == AFI_IP && safi == SAFI_MPLS_VPN) { /* not supported ipv6 vpn */
+		zlog_info("Create BGP Prefix-SID attribute for SRv6 MPLS interworking");
+		struct bgp *bgp_vrf;
+		struct listnode *node, *nnode;
+		struct ecommunity *ecomm = bgp_attr_get_ecommunity(attr);
+		for (ALL_LIST_ELEMENTS(bm->bgp, node, nnode, bgp_vrf)) {
+			if (bgp_vrf->inst_type != BGP_INSTANCE_TYPE_VRF)
+				continue;
+			if (ecommunity_include(
+				ecomm, bgp_vrf->vpn_policy[afi].rtlist[BGP_VPN_POLICY_DIR_TOVPN]))
+					break;
+		}
+		if (bgp_vrf->vpn_policy[afi].tovpn_sid_locator) {
+			struct srv6_locator_chunk *locator =
+				bgp_vrf->vpn_policy[afi].tovpn_sid_locator;
+			encode_label(
+				bgp_vrf->vpn_policy[afi].tovpn_sid_transpose_label, &label);
+			attr->srv6_l3vpn = XCALLOC(MTYPE_BGP_SRV6_L3VPN,
+					sizeof(struct bgp_attr_srv6_l3vpn)); // allocate()
+			attr->srv6_l3vpn->sid_flags = 0x00;
+			attr->srv6_l3vpn->endpoint_behavior =
+				afi == AFI_IP
+					? (CHECK_FLAG(locator->flags, SRV6_LOCATOR_USID)
+						? SRV6_ENDPOINT_BEHAVIOR_END_DT4_USID
+						: SRV6_ENDPOINT_BEHAVIOR_END_DT4)
+					: (CHECK_FLAG(locator->flags, SRV6_LOCATOR_USID)
+						? SRV6_ENDPOINT_BEHAVIOR_END_DT6_USID
+						: SRV6_ENDPOINT_BEHAVIOR_END_DT6);
+			attr->srv6_l3vpn->loc_block_len = 
+				bgp_vrf->vpn_policy[afi]
+					.tovpn_sid_locator->block_bits_length;
+			attr->srv6_l3vpn->loc_node_len = 
+				bgp_vrf->vpn_policy[afi]
+					.tovpn_sid_locator->node_bits_length;
+			attr->srv6_l3vpn->func_len = 
+				bgp_vrf->vpn_policy[afi]
+					.tovpn_sid_locator->function_bits_length;
+			attr->srv6_l3vpn->arg_len = 
+				bgp_vrf->vpn_policy[afi]
+					.tovpn_sid_locator->argument_bits_length;
+			attr->srv6_l3vpn->transposition_len = 
+				bgp_vrf->vpn_policy[afi]
+					.tovpn_sid_locator->function_bits_length;
+			attr->srv6_l3vpn->transposition_offset = 
+				bgp_vrf->vpn_policy[afi]
+					.tovpn_sid_locator->node_bits_length +
+				bgp_vrf->vpn_policy[afi]
+					.tovpn_sid_locator->block_bits_length;
+			memcpy(&attr->srv6_l3vpn->sid,
+					&bgp_vrf->vpn_policy[afi]
+						.tovpn_sid_locator->prefix.prefix,
+					sizeof(struct in6_addr));
+		}
+	}
+
 	/* SRv6 Service Information Attribute. */
 	if ((afi == AFI_IP || afi == AFI_IP6) && safi == SAFI_MPLS_VPN) {
 		/* draft-spring-srv6-mpls-interworking-service-iw (yokoo) */
