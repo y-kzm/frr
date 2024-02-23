@@ -4338,7 +4338,7 @@ void bgp_mplspvn_nh_label_bind_register_sid(struct bgp *bgp,
 				bmnc->allocation_in_progress = false;
 				break;
 		}
-	}		   bgp_mplsvpn_nh_label_bind_get_local_label_cb);
+	}
 
 	if (pi->mplsvpn.bmnc.nh_label_bind_cache == bmnc)
 	 	/* no change */

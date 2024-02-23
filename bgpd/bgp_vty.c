@@ -20674,7 +20674,7 @@ void bgp_vty_init(void)
 
 	/* "neighbor strict-capability-match" commands. */
 	install_element(BGP_NODE, &neighbor_strict_capability_cmd);
-	//install_element(BGP_NODE, &no_neighbor_strict_capability_cmd);
+	install_element(BGP_NODE, &no_neighbor_strict_capability_cmd);
 
 	/* "neighbor timers" commands. */
 	install_element(BGP_NODE, &neighbor_timers_cmd);
